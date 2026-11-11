@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Box Breath - Breathe</title>
+<meta name="description" content="Guided box breathing. Press Start and follow the square.">
+<meta name="theme-color" content="#0e2a3b">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Box Breath">
+<style>
+  :root {
+    --bg1: #0e2a3b; --bg2: #123f4d; --ink: #f4f9fb; --soft: #b9d3dc;
+    --accent: #7fe0c7; --accent-ink: #06231f; --line: rgba(255,255,255,.28);
+    --card: rgba(255,255,255,.08);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    background: linear-gradient(170deg, var(--bg1), var(--bg2)) fixed;
+    -webkit-tap-highlight-color: transparent;
+    display: flex; flex-direction: column; align-items: center;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  }
+  main { width: 100%; max-width: 560px; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
+  h1 { font-size: 1.6rem; font-weight: 600; margin: 0; letter-spacing: .01em; }
+  .stage { position: relative; width: min(72vw, 46vh, 360px); aspect-ratio: 1; }
+  .stage svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; pointer-events: none; }
+  #phase { font-size: clamp(1.7rem, 7vw, 2.4rem); font-weight: 600; }
+  #count { font-size: clamp(2.6rem, 12vw, 4rem); font-weight: 300; line-height: 1.1; min-height: 1.1em; font-variant-numeric: tabular-nums; }
+  #remaining { font-size: 1.15rem; color: var(--soft); min-height: 1.4em; font-variant-numeric: tabular-nums; }
+  button.big {
+    font: inherit; font-size: 1.6rem; font-weight: 700; color: var(--accent-ink); background: var(--accent);
+    border: 0; border-radius: 999px; padding: 18px 0; width: min(100%, 320px); min-height: 68px; cursor: pointer;
+    box-shadow: 0 6px 24px rgba(0,0,0,.25);
+  }
+  button.big.stop { background: transparent; color: var(--ink); border: 2px solid var(--line); box-shadow: none; }
+  button:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+  .options { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .opt { background: var(--card); border-radius: 16px; padding: 10px 12px 12px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .opt label { font-size: 1rem; color: var(--soft); }
+  .opt select {
+    font: inherit; font-size: 1.15rem; font-weight: 600; color: var(--ink); background: transparent; border: 0; width: 100%;
+    padding: 6px 0; min-height: 44px; cursor: pointer; text-overflow: ellipsis;
+  }
+  .opt select option { color: #10242e; background: #fff; }
+  .note { font-size: .95rem; color: var(--soft); text-align: center; margin: 0; max-width: 46ch; line-height: 1.45; }
+  .note a { color: var(--ink); }
+  body.running .options, body.running .note, body.running h1 { display: none; }
+  body:not(.running) #remaining { display: none; }
+  #dot { transition: opacity .3s; }
+  body:not(.running) #dot { opacity: 0; }
+  @media (max-width: 330px) { .options { grid-template-columns: 1fr; } }
+  @media (orientation: landscape) and (max-height: 520px) {
+    main { flex-direction: row; flex-wrap: wrap; gap: 14px 28px; }
+    h1 { width: 100%; text-align: center; font-size: 1.2rem; }
+    .stage { width: min(40vw, 62vh); }
+    .side { display: flex; flex-direction: column; gap: 12px; align-items: center; flex: 1; min-width: 260px; }
+  }
+  .side { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Box Breath</h1>
+
+  <div class="stage" aria-hidden="true">
+    <svg viewBox="0 0 300 300">
+      <rect id="fill" x="30" y="30" width="240" height="240" rx="26" fill="rgba(127,224,199,.16)"/>
+      <rect x="30" y="30" width="240" height="240" rx="26" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="4"/>
+      <circle id="dot" cx="30" cy="270" r="13" fill="#7fe0c7" stroke="#fff" stroke-width="3"/>
+    </svg>
+    <div class="center">
+      <div id="phase">Ready?</div>
+      <div id="count"></div>
+    </div>
+  </div>
+
+  <div class="side">
+    <div id="remaining" role="timer"></div>
+    <button id="go" class="big" type="button">Start</button>
+
+    <div class="options">
+      <div class="opt"><label for="voice">Voice</label><select id="voice"></select></div>
+      <div class="opt"><label for="sound">Sound</label>
+        <select id="sound">
+          <option value="off">No sound</option>
+          <option value="rain">Rain</option>
+          <option value="ocean">Ocean waves</option>
+          <option value="forest">Forest birds</option>
+          <option value="stream">Stream</option>
+        </select></div>
+      <div class="opt"><label for="minutes">Time</label>
+        <select id="minutes">
+          <option value="1">1 minute</option>
+          <option value="3">3 minutes</option>
+          <option value="5">5 minutes</option>
+          <option value="10">10 minutes</option>
+        </select></div>
+      <div class="opt"><label for="pace">Pace</label>
+        <select id="pace">
+          <option value="3">Gentle (3 counts)</option>
+          <option value="4">Classic (4 counts)</option>
+          <option value="5">Slow (5 counts)</option>
+        </select></div>
+    </div>
+    <p class="note">Breathe in, hold, breathe out, hold. Stop if you feel dizzy. Not medical advice. <a href="../">About</a></p>
+  </div>
+</main>
+
+<div id="live" aria-live="assertive" style="position:absolute;left:-9999px"></div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var els = { go: $('go'), phase: $('phase'), count: $('count'), remaining: $('remaining'), dot: $('dot'), fill: $('fill'),
+              voice: $('voice'), sound: $('sound'), minutes: $('minutes'), pace: $('pace'), live: $('live') };
+
+  // ---------- Settings ----------
+  var defaults = { voice: 'auto', sound: 'off', minutes: '5', pace: '4' };
+  var settings = Object.assign({}, defaults);
+  try { Object.assign(settings, JSON.parse(localStorage.getItem('boxbreath') || '{}')); } catch (e) {}
+  function save() { try { localStorage.setItem('boxbreath', JSON.stringify(settings)); } catch (e) {} }
+  ['sound', 'minutes', 'pace'].forEach(function (k) {
+    els[k].value = settings[k];
+    if (els[k].value !== settings[k]) { settings[k] = defaults[k]; els[k].value = defaults[k]; }
+    els[k].addEventListener('change', function () { settings[k] = els[k].value; save(); if (k === 'sound') previewSound(); });
+  });
+
+  // ---------- Voices ----------
+  var synth = window.speechSynthesis || null;
+  var voices = [];
+  var ACCENTS = { 'en-us': 'American', 'en-gb': 'British', 'en-au': 'Australian', 'en-in': 'Indian', 'en-ie': 'Irish',
+                  'en-za': 'South African', 'en-ca': 'Canadian', 'en-nz': 'New Zealand', 'en-sg': 'Singaporean', 'en-ph': 'Filipino',
+                  'en-ng': 'Nigerian', 'en-ke': 'Kenyan', 'en-hk': 'Hong Kong', 'en-tz': 'Tanzanian' };
+  var FEMALE = ['samantha','karen','moira','tessa','victoria','allison','ava','susan','zoe','nicky','kate','serena','fiona','veena','isha',
+                'sangeeta','catherine','martha','zira','hazel','libby','sonia','jenny','aria','michelle','natasha','emma','joanna','kendra',
+                'kimberly','salli','amy','olivia','clara','molly','neerja','leah','luna','emily','maisie','female','flo','sandy','shelley','grandma','kathy','stephanie','linda','heather','ana'];
+  var MALE = ['daniel','alex','tom','fred','aaron','arthur','gordon','oliver','rishi','lee','evan','nathan','ralph','david','mark','george',
+              'ryan','guy','christopher','eric','william','james','brian','matthew','joey','justin','liam','thomas','prabhat','male','eddy','reed','rocko','grandpa','richard','sean','connor','mitchell','luke'];
+  var NOVELTY = ['albert','bad news','bahh','bells','boing','bubbles','cellos','good news','jester','organ','superstar','trinoids','whisper','wobble','zarvox','junior','deranged','hysterical','pipe organ','princess'];
+  function nameWords(v) { return v.name.toLowerCase().replace(/[()\-_,]/g, ' ').split(/\s+/); }
+  function gender(v) {
+    var w = nameWords(v), n = v.name.toLowerCase();
+    if (n.indexOf('google us english') === 0) return 'Female';
+    for (var i = 0; i < w.length; i++) { if (FEMALE.indexOf(w[i]) > -1) return 'Female'; if (MALE.indexOf(w[i]) > -1) return 'Male'; }
+    return '';
+  }
+  function accent(v) { return ACCENTS[v.lang.toLowerCase().replace('_', '-')] || 'English'; }
+  function shortName(v) {
+    return v.name.replace(/^Microsoft\s+/i, '').replace(/^Google\s+/i, '').replace(/\s*\(.*$/, '')
+      .replace(/\s+Online.*$/i, '').replace(/\s+-\s+English.*$/i, '').replace(/(US|UK) English\s*(Female|Male)?/i, 'Standard').trim() || v.name;
+  }
+  function loadVoices() {
+    if (!synth) return;
+    var all = synth.getVoices().filter(function (v) {
+      if (!/^en([-_]|$)/i.test(v.lang)) return false;
+      var n = v.name.toLowerCase();
+      return !NOVELTY.some(function (x) { return n.indexOf(x) === 0; });
+    });
+    // De-duplicate by name+lang and sort by accent then gender.
+    var seen = {}; voices = [];
+    all.forEach(function (v) { var k = v.name + v.lang; if (!seen[k]) { seen[k] = 1; voices.push(v); } });
+    var order = Object.keys(ACCENTS);
+    voices.sort(function (a, b) {
+      var ia = order.indexOf(a.lang.toLowerCase().replace('_', '-')), ib = order.indexOf(b.lang.toLowerCase().replace('_', '-'));
+      if (ia < 0) ia = 99; if (ib < 0) ib = 99;
+      return ia - ib || gender(a).localeCompare(gender(b)) || a.name.localeCompare(b.name);
+    });
+    var html = '';
+    if (voices.length) html += '<option value="auto">Calm voice</option>';
+    html += '<option value="off">No voice (soft chimes)</option>';
+    var groups = {};
+    voices.forEach(function (v, i) { var a = accent(v); (groups[a] = groups[a] || []).push(i); });
+    Object.keys(groups).forEach(function (a) {
+      html += '<optgroup label="' + a + '">';
+      groups[a].forEach(function (i) {
+        var v = voices[i], g = gender(v);
+        html += '<option value="v:' + i + '">' + a + (g ? ' ' + g.toLowerCase() : '') + ' – ' + shortName(v).replace(/</g, '') + '</option>';
+      });
+      html += '</optgroup>';
+    });
+    els.voice.innerHTML = html;
+    // Restore saved choice by voice name.
+    var want = settings.voice, val = voices.length ? 'auto' : 'off';
+    if (want === 'off') val = 'off';
+    else if (want !== 'auto') { voices.forEach(function (v, i) { if (v.name === want) val = 'v:' + i; }); }
+    els.voice.value = val;
+  }
+  function pickVoice() {
+    var val = els.voice.value;
+    if (val === 'off' || !synth) return null;
+    if (val.indexOf('v:') === 0) return voices[+val.slice(2)] || null;
+    var prefs = ['Samantha', 'Google US English', 'Microsoft Aria', 'Microsoft Jenny', 'Karen', 'Daniel'];
+    for (var p = 0; p < prefs.length; p++) for (var i = 0; i < voices.length; i++) if (voices[i].name.indexOf(prefs[p]) === 0) return voices[i];
+    for (var j = 0; j < voices.length; j++) if (voices[j].default) return voices[j];
+    return voices[0] || null;
+  }
+  function voiceOn() { return !!synth && els.voice.value !== 'off' && voices.length > 0; }
+  function say(text) {
+    if (!voiceOn()) return;
+    try {
+      synth.cancel();
+      var u = new SpeechSynthesisUtterance(text), v = pickVoice();
+      if (v) { u.voice = v; u.lang = v.lang; } else { u.lang = 'en-US'; }
+      u.rate = 0.85; u.pitch = 1; u.volume = 1;
+      synth.speak(u);
+    } catch (e) {}
+  }
+  els.voice.addEventListener('change', function () {
+    var val = els.voice.value;
+    settings.voice = val.indexOf('v:') === 0 ? voices[+val.slice(2)].name : val;
+    save();
+    if (val !== 'off') say('Breathe in');
+  });
+  loadVoices();
+  if (synth) {
+    if (synth.addEventListener) synth.addEventListener('voiceschanged', loadVoices);
+    else synth.onvoiceschanged = loadVoices;
+    setTimeout(loadVoices, 600); setTimeout(loadVoices, 2000);
+  }
+
+  // ---------- Sound (all generated on the device, no downloads) ----------
+  var AC = window.AudioContext || window.webkitAudioContext;
+  var ctx = null, master = null, bed = null, birdTimer = null, previewTimer = null;
+  function audio() {
+    if (!AC) return null;
+    if (!ctx) { ctx = new AC(); master = ctx.createGain(); master.gain.value = 1; master.connect(ctx.destination); }
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+  function noiseBuffer(kind) {
+    var len = ctx.sampleRate * 4, buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0), last = 0;
+    for (var i = 0; i < len; i++) {
+      var w = Math.random() * 2 - 1;
+      if (kind === 'brown') { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; } else d[i] = w;
+    }
+    return buf;
+  }
+  function src(kind) { var s = ctx.createBufferSource(); s.buffer = noiseBuffer(kind); s.loop = true; s.start(); return s; }
+  function filt(type, f, q) { var b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; if (q) b.Q.value = q; return b; }
+  function gainNode(v) { var g = ctx.createGain(); g.gain.value = v; return g; }
+  function lfo(freq, depth, target) { var o = ctx.createOscillator(), g = gainNode(depth); o.frequency.value = freq; o.connect(g); g.connect(target); o.start(); return o; }
+  function chain() { for (var i = 0; i < arguments.length - 1; i++) arguments[i].connect(arguments[i + 1]); }
+  function chirp(out) {
+    var t = ctx.currentTime + 0.05, notes = 2 + Math.floor(Math.random() * 4), base = 2200 + Math.random() * 2200;
+    for (var i = 0; i < notes; i++) {
+      var o = ctx.createOscillator(), g = gainNode(0), st = t + i * (0.11 + Math.random() * 0.06);
+      o.type = 'sine';
+      o.frequency.setValueAtTime(base * (0.9 + Math.random() * 0.3), st);
+      o.frequency.exponentialRampToValueAtTime(base * (1.1 + Math.random() * 0.5), st + 0.08);
+      g.gain.setValueAtTime(0, st); g.gain.linearRampToValueAtTime(0.035, st + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, st + 0.1);
+      chain(o, g, out); o.start(st); o.stop(st + 0.12);
+    }
+  }
+  function startBed(kind) {
+    stopBed();
+    if (kind === 'off' || !audio()) return;
+    var out = gainNode(0); out.connect(master);
+    var nodes = [];
+    if (kind === 'rain') {
+      var r = src('white'); chain(r, filt('highpass', 900), filt('lowpass', 7000), gainNode(0.10), out);
+      var rum = src('brown'); chain(rum, filt('lowpass', 300), gainNode(0.25), out); nodes.push(r, rum);
+    } else if (kind === 'ocean') {
+      var o1 = src('brown'), g1 = gainNode(0.45); chain(o1, filt('lowpass', 600), g1, out);
+      var o2 = src('white'), g2 = gainNode(0.035); chain(o2, filt('bandpass', 1800, 0.5), g2, out);
+      nodes.push(o1, o2, lfo(0.09, 0.3, g1.gain), lfo(0.09, 0.03, g2.gain));
+    } else if (kind === 'stream') {
+      var s1 = src('white'), b1 = filt('bandpass', 2400, 0.9); chain(s1, b1, gainNode(0.09), out);
+      var s2 = src('white'), b2 = filt('bandpass', 900, 1.2); chain(s2, b2, gainNode(0.07), out);
+      nodes.push(s1, s2, lfo(0.7, 500, b1.frequency), lfo(1.9, 250, b2.frequency), lfo(0.23, 300, b1.frequency));
+    } else if (kind === 'forest') {
+      var w = src('brown'), gw = gainNode(0.22); chain(w, filt('lowpass', 900), gw, out);
+      var lv = src('white'), gl = gainNode(0.012); chain(lv, filt('highpass', 3000), gl, out);
+      nodes.push(w, lv, lfo(0.07, 0.12, gw.gain), lfo(0.11, 0.008, gl.gain));
+      (function loop() { birdTimer = setTimeout(function () { if (bed && bed.out === out) { chirp(out); loop(); } }, 1500 + Math.random() * 5000); })();
+    }
+    out.gain.setValueAtTime(0, ctx.currentTime); out.gain.linearRampToValueAtTime(0.9, ctx.currentTime + 2);
+    bed = { out: out, nodes: nodes };
+  }
+  function stopBed() {
+    clearTimeout(birdTimer); clearTimeout(previewTimer);
+    if (!bed) return;
+    var b = bed; bed = null;
+    try { b.out.gain.cancelScheduledValues(ctx.currentTime); b.out.gain.setTargetAtTime(0, ctx.currentTime, 0.3); } catch (e) {}
+    setTimeout(function () { b.nodes.forEach(function (n) { try { n.stop(); } catch (e) {} }); try { b.out.disconnect(); } catch (e) {} }, 1500);
+  }
+  function previewSound() {
+    if (running) return;
+    startBed(els.sound.value);
+    previewTimer = setTimeout(stopBed, 5000);
+  }
+  function chime(freq) {
+    if (!audio()) return;
+    var t = ctx.currentTime, o = ctx.createOscillator(), g = gainNode(0);
+    o.type = 'sine'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.22, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+    chain(o, g, master); o.start(t); o.stop(t + 1.5);
+  }
+
+  // ---------- Session ----------
+  var PHASES = [
+    { text: 'Breathe in', say: 'Breathe in', tone: 523.25 },
+    { text: 'Hold', say: 'Hold', tone: 392.0 },
+    { text: 'Breathe out', say: 'Breathe out', tone: 329.63 },
+    { text: 'Hold', say: 'Hold', tone: 392.0 }
+  ];
+  var CORNERS = [[30, 270], [30, 30], [270, 30], [270, 270]];
+  var running = false, raf = 0, startAt = 0, lastPhase = -2, lastCount = -1, pace = 4, total = 300, wake = null, endTimer = null;
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var LEAD = 3; // seconds of "get ready" before the first breath
+
+  function setFill(scale) { els.fill.setAttribute('transform', 'translate(150 150) scale(' + scale.toFixed(4) + ') translate(-150 -150)'); }
+  function fmt(s) { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
+  function ease(x) { return 0.5 - Math.cos(Math.PI * x) / 2; }
+
+  function frame() {
+    if (!running) return;
+    var t = (performance.now() - startAt) / 1000 - LEAD;
+    if (t < 0) {
+      var c = Math.ceil(-t);
+      if (c !== lastCount) { lastCount = c; els.count.textContent = c; }
+      raf = requestAnimationFrame(frame); return;
+    }
+    if (t >= total) { finish(); return; }
+    var idx = Math.floor(t / pace) % 4, into = (t % pace) / pace;
+    if (idx !== lastPhase) {
+      lastPhase = idx; lastCount = -1;
+      els.phase.textContent = PHASES[idx].text;
+      if (voiceOn()) say(PHASES[idx].say); else chime(PHASES[idx].tone);
+    }
+    var n = Math.min(pace, Math.floor(into * pace) + 1);
+    if (n !== lastCount) { lastCount = n; els.count.textContent = n; }
+    var a = CORNERS[idx], b = CORNERS[(idx + 1) % 4];
+    els.dot.setAttribute('cx', a[0] + (b[0] - a[0]) * into);
+    els.dot.setAttribute('cy', a[1] + (b[1] - a[1]) * into);
+    if (!reduce) setFill(idx === 0 ? 0.55 + 0.45 * ease(into) : idx === 1 ? 1 : idx === 2 ? 1 - 0.45 * ease(into) : 0.55);
+    els.remaining.textContent = fmt(total - t) + ' left';
+    raf = requestAnimationFrame(frame);
+  }
+
+  function start() {
+    clearTimeout(endTimer);
+    pace = +els.pace.value || 4;
+    var cycle = pace * 4;
+    total = Math.max(1, Math.round((+els.minutes.value || 5) * 60 / cycle)) * cycle; // whole cycles only
+    running = true; lastPhase = -1; lastCount = -1;
+    document.body.classList.add('running');
+    els.go.textContent = 'Stop'; els.go.classList.add('stop');
+    els.phase.textContent = 'Get ready'; els.remaining.textContent = fmt(total) + ' left';
+    els.dot.setAttribute('cx', 30); els.dot.setAttribute('cy', 270); setFill(reduce ? 1 : 0.55);
+    audio(); startBed(els.sound.value);
+    say('Get ready');
+    if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (w) { wake = w; }).catch(function () {});
+    startAt = performance.now();
+    raf = requestAnimationFrame(frame);
+  }
+  function reset(msg) {
+    running = false; cancelAnimationFrame(raf);
+    document.body.classList.remove('running');
+    els.go.classList.remove('stop');
+    els.count.textContent = ''; els.phase.textContent = msg;
+    setFill(1); stopBed();
+    if (wake) { try { wake.release(); } catch (e) {} wake = null; }
+  }
+  function stop() { if (synth) synth.cancel(); reset('Ready?'); els.go.textContent = 'Start'; }
+  function finish() {
+    reset('Well done');
+    els.go.textContent = 'Again';
+    if (voiceOn()) say('Well done'); else { chime(523.25); setTimeout(function () { chime(659.25); }, 350); }
+    els.live.textContent = 'Session complete. Well done.';
+    endTimer = setTimeout(function () { if (!running) { els.phase.textContent = 'Ready?'; els.go.textContent = 'Start'; } }, 8000);
+  }
+  els.go.addEventListener('click', function () { running ? stop() : start(); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && running && navigator.wakeLock) navigator.wakeLock.request('screen').then(function (w) { wake = w; }).catch(function () {});
+  });
+  setFill(1);
+
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('../sw.js').catch(function () {});
+  // Still frames for store screenshots: app/?shot=home|options|in|out|done
+  var shot = (location.search.match(/[?&]shot=(\w+)/) || [])[1];
+  if (shot) {
+    var still = function (idx, into, n, left) {
+      document.body.classList.add('running'); els.go.textContent = 'Stop'; els.go.classList.add('stop');
+      els.phase.textContent = PHASES[idx].text; els.count.textContent = n; els.remaining.textContent = left;
+      var a = CORNERS[idx], b = CORNERS[(idx + 1) % 4];
+      els.dot.setAttribute('cx', a[0] + (b[0] - a[0]) * into); els.dot.setAttribute('cy', a[1] + (b[1] - a[1]) * into);
+      setFill(idx === 0 ? 0.55 + 0.45 * ease(into) : 1 - 0.45 * ease(into));
+    };
+    els.minutes.value = '5'; els.pace.value = '4'; els.sound.value = 'off';
+    els.voice.innerHTML = '<option>Calm voice</option>';
+    if (shot === 'options') { els.voice.innerHTML = '<option>British male</option>'; els.sound.value = 'ocean'; }
+    if (shot === 'in') still(0, 0.6, 3, '4:46 left');
+    if (shot === 'out') still(2, 0.35, 2, '2:10 left');
+    if (shot === 'done') { els.phase.textContent = 'Well done'; els.go.textContent = 'Again'; }
+  }
+  window.__bb = { state: function () { return { running: running, total: total, pace: pace, voices: voices.length, bed: !!bed, ctx: ctx && ctx.state }; } };
+})();
+</script>
+</body>
+</html>

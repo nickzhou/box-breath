@@ -1,0 +1,7 @@
+{
+  "appId": "com.REPLACE_ME.boxbreath",
+  "appName": "Box Breath",
+  "webDir": "site",
+  "backgroundColor": "#0e2a3b",
+  "ios": { "contentInset": "never" }
+}

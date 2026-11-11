@@ -1,0 +1,21 @@
+{
+  "name": "box-breath",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Box Breath: guided box breathing. Web app in site/, wrapped for iOS and Android with Capacitor.",
+  "scripts": {
+    "serve": "python3 tools/serve.py 8765",
+    "icons": "python3 tools/make_icons.py site/icons",
+    "sync": "cap sync",
+    "ios": "cap open ios",
+    "android": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "latest",
+    "@capacitor/core": "latest",
+    "@capacitor/ios": "latest"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "latest"
+  }
+}
